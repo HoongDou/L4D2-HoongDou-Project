@@ -4,7 +4,7 @@
 #include <colors>
 #include <adminmenu>
 
-#define PLUGIN_VERSION "v2.1"
+#define PLUGIN_VERSION "v2.2"
 
 public Plugin:myinfo=
 {
