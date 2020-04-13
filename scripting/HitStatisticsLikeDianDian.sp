@@ -51,17 +51,17 @@ HookEvents()
 {
     HookEvent("round_start", RoundStart_Event, EventHookMode_PostNoCopy);
     HookEvent("scavenge_round_start", EventHook:ScavRoundStart);
-	HookEvent("round_end",				Event_RoundEnd);
-	HookEvent("tongue_grab",			Event_SmokerGrabbed);
-	HookEvent("lunge_pounce",			Event_HunterPounced);
-	HookEvent("player_now_it",			Event_BoomerAttackEXP);
+    HookEvent("round_end",				Event_RoundEnd);
+    HookEvent("tongue_grab",			Event_SmokerGrabbed);
+    HookEvent("lunge_pounce",			Event_HunterPounced);
+    HookEvent("player_now_it",			Event_BoomerAttackEXP);
     HookEvent("charger_pummel_start",	Event_ChargerPummel);
-	HookEvent("charger_impact",			Event_ChargerImpact);
-	HookEvent("jockey_ride",			Event_JockeyRide);
-	HookEvent("player_hurt", 			Event_PlayerHurt);
-	HookEvent("tank_spawn", 			Event_TankSpawn);
+    HookEvent("charger_impact",			Event_ChargerImpact);
+    HookEvent("jockey_ride",			Event_JockeyRide);
+    HookEvent("player_hurt", 			Event_PlayerHurt);
+    HookEvent("tank_spawn", 			Event_TankSpawn);
     HookEvent("tank_killed",            Event_TankKilled);
-	HookEvent("player_death",			Event_PlayerDeath);
+    HookEvent("player_death",			Event_PlayerDeath);
 }
 
 
@@ -114,8 +114,8 @@ public MyKillsStatistic(Client)
 		decl String:line[256];
 		Format(line, sizeof(line), "{green}[ {green}被拉 {red}%d {green}][ 被扑 {red}%d {green}][ 被吐 {red}%d {green}][ 被撞 {red}%d {green}][ 被骑 {red}%d {green}] {olive}%N", iSmoker[Client], iHunter[Client], iBoomer[Client], iCharger[Client], iJockey[Client], Client);
 		CPrintToChat(Client, line);
-        Format(line, sizeof(line), "{green}[拳头 {red}%d {green}][石头 {red}%d {green}] {olive}%N", iTankClaw[Client], iTankRock[Client], Client);
-        CPrintToChat(Client, line);
+                Format(line, sizeof(line), "{green}[拳头 {red}%d {green}][石头 {red}%d {green}] {olive}%N", iTankClaw[Client], iTankRock[Client], Client);
+        	CPrintToChat(Client, line);
 	}
 	else
 	{
