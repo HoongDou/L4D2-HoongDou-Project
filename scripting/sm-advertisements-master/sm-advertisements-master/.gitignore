@@ -1,0 +1,3 @@
+.vscode/
+/addons/sourcemod/plugins/*
+!addons/sourcemod/plugins/.gitkeep

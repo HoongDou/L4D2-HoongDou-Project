@@ -1,0 +1,14 @@
+"Updater"
+{
+    "Information"
+    {
+        "Version"
+        {
+            "Latest"	"$TRAVIS_TAG"
+        }
+    }
+    "Files"
+    {
+        "Plugin"	"Path_Mod/addons/sourcemod/plugins/advertisements.smx"
+    }
+}

@@ -1,0 +1,1 @@
+[Install PTaH](https://ptah.zizt.ru/)
