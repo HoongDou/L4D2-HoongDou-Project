@@ -9,17 +9,19 @@ L4D2 HoongDou's Server Scripting and some Plugins
 ## Folder Scripting is my Compiler Environment
 Scripting是编译环境，有兴趣的可以自行下载。
 
-## tank_and_witch_ifier
+## Plugin list:
+
+1. tank_and_witch_ifier
 按Zonemod的写法，每关生成一个Tank和一个witch。
 
-## connect_infomation
+2. connect_infomation
 使用旧版的geoipcity数据库，显示连接城市和断开连接的原因。一个低配版本的cannounce.
 
-## healup
+3. healup
 离开安全门时幸存者回满血
 
-## survivor_mvp
+4. survivor_mvp
 药役用，特性是关闭终点安全门时生还有人在门内的情况下会再次显示mvp信息。
 
-## HitStatisticsLikeDianDian
+5. HitStatisticsLikeDianDian
 被控信息统计，仿点点写的。
