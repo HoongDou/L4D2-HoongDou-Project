@@ -8,7 +8,7 @@
 #include <sdktools>
 #include <left4dhooks>
 
-#define PLUGIN_VERSION "9.1.1c"
+#define PLUGIN_VERSION "9.1.1e"
 
 #define NULL_VELOCITY view_as<float>({0.0, 0.0, 0.0})
 
@@ -30,7 +30,7 @@
 public Plugin myinfo =
 {
 	name = "L4D2 Ready-Up with convenience fixes",
-	author = "CanadaRox, Target",
+	author = "CanadaRox, Target,HoongDou",
 	description = "New and improved ready-up plugin with optimal for convenience.",
 	version = PLUGIN_VERSION,
 	url = "https://github.com/Target5150/MoYu_Server_Stupid_Plugins"
@@ -246,6 +246,24 @@ public void PlayerTeam_Event(Event event, const char[] name, bool dontBroadcast)
 		stack.Push(GetClientUserId(client));
 		stack.Push(oldteam);
 		g_hChangeTeamTimer[client] = CreateTimer(0.1, Timer_PlayerTeam, stack, TIMER_FLAG_NO_MAPCHANGE);
+	}
+}
+
+//auto-start
+public void L4D2_OnPlayerTeamChanged(int client, int oldteam, int nowteam)
+{
+	if (IsValidInGame(client) && !IsFakeClient(client))
+	{
+		isClientLoading[client] = false;
+		clientTimeout[client] = 0;
+	}
+	
+	if (bReadyUpMode)
+	{
+		if (oldteam > 1 || nowteam > 1)
+		{
+			CancelFullReady(client, teamShuffle);
+		}
 	}
 }
 
@@ -951,7 +969,11 @@ public Action LoadingTimer(Handle timer)
 	}
 	if (bForceStart)
 	{
-	return Plugin_Stop;
+		return Plugin_Stop;
+	}
+	if (CheckFullReady())
+	{
+		return Plugin_Stop;
 	}
 	InitiateLiveCountdown();
 	bForceStart = true;
@@ -1734,4 +1756,20 @@ stock int GetTeamHumanCount(int team)
 	}
 	
 	return humans;
+}
+
+//auto-start
+stock bool IsValidClient(int client)
+{
+	return client > 0 && client <= MaxClients;
+}
+
+stock bool IsConnectedAndInGame(int client)
+{
+	return IsClientConnected(client) && IsClientInGame(client);
+}
+
+stock bool IsValidInGame(int client)
+{
+	return IsValidClient(client) && IsConnectedAndInGame(client);
 }
