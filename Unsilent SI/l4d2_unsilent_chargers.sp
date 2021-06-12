@@ -7,7 +7,7 @@ public Plugin:myinfo =
 	name = "L4D2-Unsilent-Chargers",
 	author = "HoongDou",
 	description = "Makes Chargers emit a sound to all players upon spawning, to nerf wallkicks a bit more.",
-	version = "1.0.0",
+	version = "1.0.1",
 	url = "https://github.com/HoongDou/L4D2-HoongDou-Project"
 };
 
@@ -47,7 +47,7 @@ public Action:PlayChargerSpawnSound(Handle:timer, client)
 		return Plugin_Handled;
 
 	// Pick random charger sound and play it
-	new randomSound = GetRandomInt(1, 2);
+	new randomSound = GetRandomInt(0, 1);
 	EmitSoundToAll(g_aChargerSounds[randomSound], client, SNDCHAN_AUTO, SNDLEVEL_NORMAL);
 	
 	return Plugin_Continue;

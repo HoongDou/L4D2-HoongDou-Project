@@ -47,7 +47,7 @@ public Action:PlayJockeySpawnSound(Handle:timer, client)
 		return Plugin_Handled;
 
 	// Pick random jockey sound and play it
-	new randomSound = GetRandomInt(1, 2);
+	new randomSound = GetRandomInt(0, 1);
 	EmitSoundToAll(g_aJockeySounds[randomSound], client, SNDCHAN_AUTO, SNDLEVEL_NORMAL);
 	
 	return Plugin_Continue;

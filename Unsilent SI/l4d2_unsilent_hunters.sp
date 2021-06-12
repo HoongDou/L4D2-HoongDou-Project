@@ -7,7 +7,7 @@ public Plugin:myinfo =
 	name = "L4D2-Unsilent-Hunters",
 	author = "HoongDou",
 	description = "Makes Hunters emit a sound to all players upon spawning, to nerf wallkicks a bit more.",
-	version = "1.0.0",
+	version = "1.0.1",
 	url = "https://github.com/HoongDou/L4D2-HoongDou-Project"
 };
 
@@ -50,7 +50,7 @@ public Action:PlayHunterSpawnSound(Handle:timer, client)
 		return Plugin_Handled;
 
 	// Pick random hunter sound and play it
-	new randomSound = GetRandomInt(1, 5);
+	new randomSound = GetRandomInt(0, 4);
 	EmitSoundToAll(g_aHunterSounds[randomSound], client, SNDCHAN_AUTO, SNDLEVEL_NORMAL);
 	
 	return Plugin_Continue;

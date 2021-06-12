@@ -7,7 +7,7 @@ public Plugin:myinfo =
 	name = "L4D2-Unsilent-Boomers",
 	author = "HoongDou",
 	description = "Makes Boomers emit a sound to all players upon spawning, to nerf wallkicks a bit more.",
-	version = "1.0.0",
+	version = "1.0.1",
 	url = "https://github.com/HoongDou/L4D2-HoongDou-Project"
 };
 
@@ -63,7 +63,7 @@ public Action:PlayBoomerSpawnSound(Handle:timer, client)
 		return Plugin_Handled;
 
 	// Pick random Boomer sound and play it
-	new randomSound = GetRandomInt(1, 18);
+	new randomSound = GetRandomInt(0, 17);
 	EmitSoundToAll(g_aBoomerSounds[randomSound], client, SNDCHAN_AUTO, SNDLEVEL_NORMAL);
 	
 	return Plugin_Continue;

@@ -51,7 +51,7 @@ public Action:PlaySmokerSpawnSound(Handle:timer, client)
 		return Plugin_Handled;
 
 	// Pick random smoker sound and play it
-	new randomSound = GetRandomInt(1, 6);
+	new randomSound = GetRandomInt(0, 5);
 	EmitSoundToAll(g_aSmokerSounds[randomSound], client, SNDCHAN_AUTO, SNDLEVEL_NORMAL);
 	
 	return Plugin_Continue;
