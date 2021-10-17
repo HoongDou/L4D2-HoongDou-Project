@@ -25,3 +25,6 @@ Scripting是编译环境，有兴趣的可以自行下载。
 
 5. HitStatisticsLikeDianDian
 被控信息统计，仿点点写的。
+
+6. modsettings
+药役/药抗用，开/关MOD设定，开启/关闭MOD后需要重载地图才能生效，使用时请确保该插件为最后一个加载的插件，否则容易出BUG。
