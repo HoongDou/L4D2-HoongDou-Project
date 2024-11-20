@@ -3,8 +3,8 @@ L4D2 HoongDou's Server Scripting and some Plugins
 
 红豆服的插件包以及一些源码。
 
-## Using sourcemod v 1.10 & v 1.9.0 compile.
-使用sourcemod v1.10和 v1.9.0 进行编译。
+## Using sourcemod v 1.10 & v 1.9.0 compile ,maybe update @ 1.12
+使用sourcemod v1.10和 v1.9.0 进行编译 ，近期更新的插件会使用较新的1.12 -git7165进行重构和更新。
 
 ## Folder Scripting is my Compiler Environment
 Scripting是编译环境，有兴趣的可以自行下载。
@@ -28,3 +28,6 @@ Scripting是编译环境，有兴趣的可以自行下载。
 
 6. modsettings
 药役/药抗用，开/关MOD设定，开启/关闭MOD后需要重载地图才能生效，使用时请确保该插件为最后一个加载的插件，否则容易出BUG。
+
+7.rygive
+测试用插件，比较快捷的刷物资/药品/特感，目前从1.0版本(2017)升级并重构，解决了一部分语法错误。
