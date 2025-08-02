@@ -9,7 +9,7 @@ L4D2 HoongDou's Server Scripting and some Plugins
 ## Folder Scripting is my Compiler Environment
 Scripting是编译环境，有兴趣的可以自行下载。
 
-## Plugin list(Old):
+## Plugin list:
 
 1. tank_and_witch_ifier
 按Zonemod的写法，每关生成一个Tank和一个witch。
