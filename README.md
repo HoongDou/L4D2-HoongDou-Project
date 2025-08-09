@@ -37,3 +37,6 @@ Scripting是编译环境，有兴趣的可以自行下载。
 
 9. Advanced_Uncommon_Control
 合并了 Silvers和dcx2的插件，主要实现了 爆头秒杀 防爆丧尸、Gimmy Gibs 和 Fallen Survivors，以及对防爆丧尸的正面穿透。
+
+10. 1shot
+某练习模式的回归，这次完全重构，可以通过调整特感在地面/空中受到的伤害倍率实现更极限的练习，也适应了特感血量上限(那些hunter 奇奇怪怪的血量上限也一并适配了)。
