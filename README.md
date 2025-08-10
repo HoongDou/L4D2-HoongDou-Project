@@ -40,3 +40,9 @@ Scripting是编译环境，有兴趣的可以自行下载。
 
 10. 1shot
 某练习模式的回归，这次完全重构，可以通过调整特感在地面/空中受到的伤害倍率实现更极限的练习，也适应了特感血量上限(那些hunter 奇奇怪怪的血量上限也一并适配了)。
+
+11. confogl_autoloader
+confogl系列的自动加载模式的插件，已重构。
+使用方法：1、启动项添加  confogl_autoloader_config zonemod(或者换成喜欢的模式)；
+2、设置了自动加载的，可以在server.cfg中添加  confogl_autoloader_config zonemod(或者换成喜欢的模式)；
+增加了可以在加载配置之前预执行某些配置文件，可通过启动项 +confogl_autoloader_execcfg xxxx.cfg进行。
