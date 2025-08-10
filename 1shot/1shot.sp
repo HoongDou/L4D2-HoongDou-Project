@@ -158,7 +158,7 @@ public void Event_PlayerSpawn(Event event, const char[] name, bool dontBroadcast
  * @brief 这是所有伤害逻辑的入口点。
  * @param victim        受害者实体索引。
  * @param attacker      攻击者实体索引（客户端索引）。
- * @param inflictor     造成伤害的实体（如手雷、爆炸桶）。
+ * @param inflictor     造成伤害的实体（如pipe bomb、煤气罐等）。
  * @param damage        伤害值。
  * @param damagetype    伤害类型。
  * @param weapon        武器实体索引。
@@ -249,7 +249,7 @@ public Action OnTakeDamage(int victim, int &attacker, int &inflictor, float &dam
         }
     }
     
-    // 非霰弹枪武器 - 应用伤害冷却系统，过滤高射速武器在同一游戏帧内可能产生的重复伤害事件。
+    // 非霰弹枪武器 - 应用伤害冷却系统，过滤高射速武器在同一游戏帧内可能产生的重复伤害事件。(OnTakeDamage触发了两次)
     float currentTime = GetGameTime();
     if (currentTime - g_fLastDamageTime[victim] < 0.15 && 
         attacker == g_iLastDamageAttacker[victim] &&
@@ -342,14 +342,14 @@ Action ProcessDamage(int victim, int attacker, int weapon, float damage)
 }
 
 // ==========================================================================================
-// --- 定时器回调 (Timer Callbacks) ---
+// --- 计时器回调 (Timer Callbacks) ---
 // ==========================================================================================
 
 /**
  * @brief 霰弹枪伤害累积窗口结束时触发。
- * @param timer         定时器句柄。
+ * @param timer         计时器句柄。
  * @param pack          包含攻击者和受害者信息的数据包。
- * @return              Plugin_Stop停止定时器。
+ * @return              Plugin_Stop停止计时器。
  */
 public Action Timer_ProcessShotgunDamage(Handle timer, int pack)
 {
@@ -388,8 +388,8 @@ public Action Timer_ProcessShotgunDamage(Handle timer, int pack)
 }
 
 /**
- * @brief 播放击杀奖励音效的定时器。
- * @param timer         定时器句柄。
+ * @brief 播放击杀奖励音效的计时器。
+ * @param timer         计时器句柄。
  * @param userid        攻击者的UserID。
  */
 public Action Timer_PlaySound(Handle timer, int userid)
@@ -402,8 +402,8 @@ public Action Timer_PlaySound(Handle timer, int userid)
 }
 
 /**
- * @brief 打印伤害/击杀信息的定时器。
- * @param timer         定时器句柄。
+ * @brief 打印伤害/击杀信息的计时器。
+ * @param timer         计时器句柄。
  * @param pack          包含所有打印信息所需的数据包。
  */
 public Action Timer_PrintKillMessage(Handle timer, DataPack pack)
@@ -592,7 +592,7 @@ void ResetEntityDamage(int entity)
 // ==========================================================================================
 
 /**
- * @brief 检查一个实体是否为我们想要处理的特感（玩家或AI）。
+ * @brief 检查一个实体是否为要处理的特感。
  * @param entity        实体索引。
  * @return              如果是，返回true。
  */
@@ -607,7 +607,7 @@ bool IsSpecialInfected(int entity)
 }
 
 /**
- * @brief 检查攻击者是否为有效的生还者玩家。
+ * @brief 检查攻击者是否为有效的生还者。
  * @param attacker      攻击者客户端索引。
  * @return              如果是，返回true。
  */
@@ -620,7 +620,7 @@ bool IsValidAttacker(int attacker)
 }
 
 /**
- * @brief 检查一个客户端是否为有效的特感玩家（排除Tank）。
+ * @brief 检查一个客户端是否为有效的特感（排除Tank）。
  * @param client        客户端索引。
  * @return              如果是，返回true。
  */
