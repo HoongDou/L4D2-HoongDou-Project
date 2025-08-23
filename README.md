@@ -46,3 +46,6 @@ confogl系列的自动加载模式的插件，已重构。
 使用方法：1、启动项添加  confogl_autoloader_config zonemod(或者换成喜欢的模式)；
 2、设置了自动加载的，可以在server.cfg中添加  confogl_autoloader_config zonemod(或者换成喜欢的模式)；
 增加了可以在加载配置之前预执行某些配置文件，可通过启动项 +confogl_autoloader_execcfg xxxx.cfg进行。
+
+12. advanced_spawnspecials
+一个不太成熟的刷特，基于导演系统的（指刷特数量经常被导演系统拒绝）。目前兼容了readyup。
