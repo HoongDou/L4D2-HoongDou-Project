@@ -1109,7 +1109,7 @@ public void OnRoundIsLive()
         return;
     }
     
-    PrintToServer("[YourPlugin] Signal 'OnRoundIsLive' received from Ready-Up. Waiting for survivors to leave safe area.");
+    PrintToServer("[AdvSpawn] Signal 'OnRoundIsLive' received from Ready-Up. Waiting for survivors to leave safe area.");
     g_bIsRoundLive = true;
 }
 
