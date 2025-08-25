@@ -350,7 +350,7 @@ void GetGamedata()
     }
     else
     {
-        PrintToServer("[SM] %s gamedata file not found. Generating...", "Smoker Animation Fix");
+        PrintToServer("[SM] %s gamedata file not found. Generating...", GAMEDATA);
         
         Handle fileHandle = OpenFile(filePath, "a+");
         if (fileHandle == null)
@@ -386,6 +386,6 @@ void GetGamedata()
         if (hConf == null)
             SetFailState("[SM] Failed to load auto-generated gamedata file!");
         
-        PrintToServer("[SM] %s successfully generated gamedata file!", "Smoker Animation Fix");
+        PrintToServer("[SM] %s successfully generated gamedata file!", GAMEDATA);
     }
 }
