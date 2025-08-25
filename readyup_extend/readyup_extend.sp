@@ -5,66 +5,69 @@
 #include <sdktools>
 #include <readyup>
 
-// 定义L4D2中生还者团队的索引。
+// ====================================================================================================
+// >> PLUGIN INFO & DEFINES
+// ====================================================================================================
+
 #define L4DTeam_Survivor 2
 
-//================================================================================
-// 外部插件函数	|From ReadyUp Natives
-//================================================================================
-
 // Native functions from readyup plugin
-/**
- * 检查游戏当前是否处于准备阶段。
- * @return      True if in ready-up phase, false otherwise.
- */
 native bool IsInReady();
-
-/**
- * 检查特定玩家是否已标记为准备就绪。
- * @param client    The client index.
- * @return          True if the client is ready, false otherwise.
- */
 native bool IsReady(int client);
 
-//================================================================================
-// 全局变量
-//================================================================================
+// ====================================================================================================
+// >> GLOBAL VARIABLES
+// ====================================================================================================
 
-// 追踪自动开始指令是否已被本插件触发，以防止每秒都重复执行 sm_forcestart。
-bool g_bAutoStartTriggered = false;
-// 在倒计时被取消后充当“锁”。当为 true 时，即使所有人都准备就绪，自动开始的倒计时也不会触发。
-// 这个锁只在一个玩家变为“未准备”状态时才会解除。
-bool g_bCountdownCancelled = false;
-// 用于检查玩家准备状态的主计时器的句柄。
-Handle g_hCheckReadyTimer = null;
+bool g_bAutoStartTriggered = false;  // 自动开始是否已触发
+bool g_bCountdownCancelled = false;  // 倒计时是否被取消
+Handle g_hCheckReadyTimer = null;    // 检查准备状态的定时器
+
+// ====================================================================================================
+// >> PLUGIN INFORMATION
+// ====================================================================================================
 
 public Plugin myinfo =
 {
     name = "ReadyUp Extension",
     author = "HoongDou",
     description = "Extends the L4D2 Ready-Up plugin with a highly robust auto-start and a universal sm_fs command.",
-    version = "1.4",
+    version = "1.5",
     url = "https://github.com/HoongDou/L4D2-HoongDou-Project"
 };
 
+// ====================================================================================================
+// >> PLUGIN EVENTS
+// ====================================================================================================
+
+/**
+ * @brief  插件启动时的初始化
+ */
 public void OnPluginStart()
 {
     RegConsoleCmd("sm_fs", Command_ForceStart, "让任何玩家都能强制开始游戏。");
 }
 
+/**
+ * @brief  所有插件加载完成后的检查
+ */
 public void OnAllPluginsLoaded()
 {
-	// 确保'readyup'正在运行。
     if (!LibraryExists("readyup"))
     {
         SetFailState("This plugin requires 'readyup.smx'. Please ensure the main ready-up plugin is installed and running.");
     }
 }
 
+/**
+ * @brief  地图开始时的初始化
+ */
 public void OnMapStart()
 {
-    g_bAutoStartTriggered = false;
-    g_bCountdownCancelled = false;  // 重置取消标志
+    g_bAutoStartTriggered = false;  // 重置自动开始触发标志
+    g_bCountdownCancelled = false;  // 重置倒计时取消标志
+    
+    // 启动检查准备状态的定时器
     if (g_hCheckReadyTimer != null)
     {
         delete g_hCheckReadyTimer;
@@ -72,6 +75,9 @@ public void OnMapStart()
     g_hCheckReadyTimer = CreateTimer(1.0, Timer_CheckReady, _, TIMER_REPEAT);
 }
 
+/**
+ * @brief  地图结束时的清理工作
+ */
 public void OnMapEnd()
 {
     if (g_hCheckReadyTimer != null)
@@ -81,16 +87,71 @@ public void OnMapEnd()
     }
 }
 
+// ====================================================================================================
+// >> UTILITY FUNCTIONS
+// ====================================================================================================
+
+/**
+ * @brief  获取生还者团队的人数上限
+ * @return 生还者团队人数上限
+ */
+int GetSurvivorLimit()
+{
+    ConVar cvarSurvivorLimit = FindConVar("survivor_limit");
+    if (cvarSurvivorLimit == null)
+    {
+        return 4; // 默认值为4人
+    }
+    return cvarSurvivorLimit.IntValue;
+}
+
+/**
+ * @brief  计算当前在线的真人生还者数量
+ * @return 真人生还者数量（排除电脑玩家）
+ */
+int GetHumanSurvivorCount()
+{
+    int count = 0;
+    for (int i = 1; i <= MaxClients; i++)
+    {
+        if (IsClientInGame(i) && GetClientTeam(i) == L4DTeam_Survivor && !IsFakeClient(i))
+        {
+            count++;
+        }
+    }
+    return count;
+}
+
+// ====================================================================================================
+// >> TIMER FUNCTIONS
+// ====================================================================================================
+
+/**
+ * @brief  定时检查所有真人生还者的准备状态
+ * @param  timer 定时器句柄
+ * @return 继续执行定时器
+ */
 public Action Timer_CheckReady(Handle timer)
 {
+    // 检查是否在准备阶段且未触发自动开始
     if (!IsInReady() || g_bAutoStartTriggered)
     {
         return Plugin_Continue;
     }
 
-    // 检查是否所有生还者都准备就绪
-    bool allReady = true;
-    bool hasUnreadyPlayer = false;
+    // 获取生还者团队上限和当前真人生还者数量
+    int survivorLimit = GetSurvivorLimit();
+    int humanSurvivorCount = GetHumanSurvivorCount();
+    
+    // 如果真人生还者数量未达到团队上限，不触发自动开始
+    if (humanSurvivorCount < survivorLimit)
+    {
+        return Plugin_Continue;
+    }
+
+    // 检查是否所有真人生还者都准备就绪
+    bool allHumanSurvivorsReady = true;
+    bool hasUnreadyHumanPlayer = false;
     
     for (int i = 1; i <= MaxClients; i++)
     {
@@ -98,22 +159,22 @@ public Action Timer_CheckReady(Handle timer)
         {
             if (!IsReady(i))
             {
-                allReady = false;
-                hasUnreadyPlayer = true;
+                allHumanSurvivorsReady = false;
+                hasUnreadyHumanPlayer = true;
             }
         }
     }
 
-    // 如果有人unready，重置取消标志
-    if (hasUnreadyPlayer && g_bCountdownCancelled)
+    // 如果有真人玩家取消准备，重置倒计时取消标志
+    if (hasUnreadyHumanPlayer && g_bCountdownCancelled)
     {
         g_bCountdownCancelled = false;
     }
 
-    // 只有在所有人准备且倒计时未被取消的情况下才触发自动开始
-    if (allReady && !g_bCountdownCancelled)
+    // 只有在所有真人生还者准备且倒计时未被取消的情况下才触发自动开始
+    if (allHumanSurvivorsReady && !g_bCountdownCancelled)
     {
-        PrintToChatAll(" \x04[!] \x01所有生还者已准备就绪，开始倒计时！");
+        PrintToChatAll(" \x04[!] \x01所有生还者已准备就绪 (%d/%d)，开始倒计时！", humanSurvivorCount, survivorLimit);
         ServerCommand("sm_forcestart");
         g_bAutoStartTriggered = true;
     }
@@ -121,63 +182,12 @@ public Action Timer_CheckReady(Handle timer)
     return Plugin_Continue;
 }
 
-public void OnReadyCountdownCancelled(int client, char sDisruptReason)
-{
-    g_bAutoStartTriggered = false;
-    g_bCountdownCancelled = true;  // 设置取消标志
-}
-
-public void OnRoundIsLive()
-{
-    g_bAutoStartTriggered = false;
-    g_bCountdownCancelled = false;  // 重置取消标志
-}
-
-public Action Command_ForceStart(int client, int args)
-{
-    if (client == 0)
-    {
-        ReplyToCommand(client, "[!] 此指令只能由玩家在游戏中使用。");
-        return Plugin_Handled;
-    }
-
-    if (!IsInReady())
-    {
-        ReplyToCommand(client, "[!] \x04当前不处于准备阶段，无法强制开始。");
-        return Plugin_Handled;
-    }
-
-    AdminId admin = GetUserAdmin(client);
-    bool tempAdmin = false;
-
-    if (admin == INVALID_ADMIN_ID)
-    {
-        admin = CreateAdmin();
-        if (admin == INVALID_ADMIN_ID)
-        {
-            ReplyToCommand(client, "[!] \x04创建临时管理员失败，操作失败。");
-            return Plugin_Handled;
-        }
-        SetUserAdmin(client, admin, false);
-        tempAdmin = true;
-    }
-
-    if (!GetAdminFlag(admin, Admin_Ban))
-    {
-        SetAdminFlag(admin, Admin_Ban, true);
-    }
-
-    FakeClientCommand(client, "sm_forcestart");
-
-    DataPack dp;
-    CreateDataTimer(0.2, Timer_RemoveAdmin, dp);
-    dp.WriteCell(GetClientUserId(client));
-    dp.WriteCell(tempAdmin ? admin : INVALID_ADMIN_ID);
-    dp.WriteCell(tempAdmin);
-
-    return Plugin_Handled;
-}
-
+/**
+ * @brief  延迟移除临时管理员权限
+ * @param  timer 定时器句柄
+ * @param  dp    数据包，包含客户端信息和管理员ID
+ * @return 停止定时器
+ */
 public Action Timer_RemoveAdmin(Handle timer, DataPack dp)
 {
     dp.Reset();
@@ -190,15 +200,101 @@ public Action Timer_RemoveAdmin(Handle timer, DataPack dp)
         AdminId admin = GetUserAdmin(client);
         if (admin != INVALID_ADMIN_ID)
         {
-            SetAdminFlag(admin, Admin_Ban, false);
+            SetAdminFlag(admin, Admin_Ban, false); // 移除ban权限
             
+            // 如果是临时管理员，则完全移除
             if (tempAdmin && tempAdminId != INVALID_ADMIN_ID)
             {
-                SetUserAdmin(client, INVALID_ADMIN_ID, false);
-                RemoveAdmin(tempAdminId);
+                SetUserAdmin(client, INVALID_ADMIN_ID, false); // 移除客户端的管理员身份
+                RemoveAdmin(tempAdminId); // 删除管理员对象
             }
         }
     }
 
     return Plugin_Stop;
+}
+
+// ====================================================================================================
+// >> READYUP PLUGIN CALLBACKS
+// ====================================================================================================
+
+/**
+ * @brief  倒计时被取消时的回调函数
+ * @param  client         取消倒计时的客户端
+ * @param  sDisruptReason 取消原因
+ */
+public void OnReadyCountdownCancelled(int client, char sDisruptReason)
+{
+    g_bAutoStartTriggered = false;  // 重置自动开始触发标志
+    g_bCountdownCancelled = true;   // 设置倒计时取消标志
+}
+
+/**
+ * @brief  回合正式开始时的回调函数
+ */
+public void OnRoundIsLive()
+{
+    g_bAutoStartTriggered = false;  // 重置自动开始触发标志
+    g_bCountdownCancelled = false;  // 重置倒计时取消标志
+}
+
+// ====================================================================================================
+// >> COMMAND HANDLERS
+// ====================================================================================================
+
+/**
+ * @brief  处理sm_fs强制开始命令
+ * @param  client 执行命令的客户端
+ * @param  args   命令参数
+ * @return 命令处理结果
+ */
+public Action Command_ForceStart(int client, int args)
+{
+    // 控制台无法使用此命令
+    if (client == 0)
+    {
+        ReplyToCommand(client, "[!] 此指令只能由玩家在游戏中使用。");
+        return Plugin_Handled;
+    }
+
+    // 检查是否在准备阶段
+    if (!IsInReady())
+    {
+        ReplyToCommand(client, "[!] \x04当前不处于准备阶段，无法强制开始。");
+        return Plugin_Handled;
+    }
+
+    AdminId admin = GetUserAdmin(client);
+    bool tempAdmin = false;
+
+    // 如果玩家没有管理员权限，创建临时管理员
+    if (admin == INVALID_ADMIN_ID)
+    {
+        admin = CreateAdmin();
+        if (admin == INVALID_ADMIN_ID)
+        {
+            ReplyToCommand(client, "[!] \x04创建临时管理员失败，操作失败。");
+            return Plugin_Handled;
+        }
+        SetUserAdmin(client, admin, false);
+        tempAdmin = true;
+    }
+
+    // 检查并添加ban权限（执行forcestart需要此权限）
+    if (!GetAdminFlag(admin, Admin_Ban))
+    {
+        SetAdminFlag(admin, Admin_Ban, true);
+    }
+
+    PrintToChatAll(" \x04[!] \x05%N \x01发起了强制开始！", client);
+    FakeClientCommand(client, "sm_forcestart");
+
+    // 延迟移除权限，避免命令执行时权限被立即撤销
+    DataPack dp;
+    CreateDataTimer(0.2, Timer_RemoveAdmin, dp);
+    dp.WriteCell(GetClientUserId(client));
+    dp.WriteCell(tempAdmin ? admin : INVALID_ADMIN_ID);
+    dp.WriteCell(tempAdmin);
+
+    return Plugin_Handled;
 }
