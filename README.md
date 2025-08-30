@@ -57,3 +57,6 @@ confogl系列的自动加载模式的插件，已重构。
 
 14. smoker-anim-fix
 Smoker拉人动作丢失的修复。目前只在versus模式下测试过。其他模式待测。
+
+15. MeleeInTheSafeRoom
+开局生成近战，只更新了语法。
