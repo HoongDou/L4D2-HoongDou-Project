@@ -93,7 +93,11 @@ public void OnMapStart()
     PrecacheModel( "models/weapons/melee/v_katana.mdl", true );
     PrecacheModel( "models/weapons/melee/v_machete.mdl", true );
     PrecacheModel( "models/weapons/melee/v_tonfa.mdl", true );
-    
+    PrecacheModel( "models/weapons/melee/v_riotshield.mdl", true );
+	PrecacheModel( "models/weapons/melee/v_knife_t.mdl", true );
+	PrecacheModel( "models/weapons/melee/v_shovel.mdl", true );
+	PrecacheModel( "models/weapons/melee/v_pitchfork.mdl", true );
+	
     PrecacheModel( "models/weapons/melee/w_bat.mdl", true );
     PrecacheModel( "models/weapons/melee/w_cricket_bat.mdl", true );
     PrecacheModel( "models/weapons/melee/w_crowbar.mdl", true );
@@ -104,8 +108,7 @@ public void OnMapStart()
     PrecacheModel( "models/weapons/melee/w_katana.mdl", true );
     PrecacheModel( "models/weapons/melee/w_machete.mdl", true );
     PrecacheModel( "models/weapons/melee/w_tonfa.mdl", true );
-    PrecacheModel( "models/w_models/weapons/w_sniper_scout.mdl");
-    PrecacheModel( "models/v_models/v_snip_scout.mdl");
+
     
     PrecacheGeneric( "scripts/melee/baseball_bat.txt", true );
     PrecacheGeneric( "scripts/melee/cricket_bat.txt", true );
@@ -117,7 +120,8 @@ public void OnMapStart()
     PrecacheGeneric( "scripts/melee/katana.txt", true );
     PrecacheGeneric( "scripts/melee/machete.txt", true );
     PrecacheGeneric( "scripts/melee/tonfa.txt", true );
-
+	PrecacheGeneric( "scripts/melee/riot_shield.txt", true );
+	
     int index = CreateEntityByName("weapon_sniper_scout");
     if(index != -1)
     {
