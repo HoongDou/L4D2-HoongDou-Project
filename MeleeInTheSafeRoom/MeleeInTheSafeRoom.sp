@@ -1,399 +1,415 @@
 #pragma semicolon 1
 #pragma newdecls required
-
 #include <sourcemod>
 #include <sdktools>
 
-#define VERSION "2.0.8"
+#define VERSION "3.2.0"
 
-ConVar g_hEnabled;
-ConVar g_hWeaponRandom;
-ConVar g_hWeaponRandomAmount;
-ConVar g_hWeaponBaseballBat;
-ConVar g_hWeaponCricketBat;
-ConVar g_hWeaponCrowbar;
-ConVar g_hWeaponElecGuitar;
-ConVar g_hWeaponFireAxe;
-ConVar g_hWeaponFryingPan;
-ConVar g_hWeaponGolfClub;
-ConVar g_hWeaponKnife;
-ConVar g_hWeaponKatana;
-ConVar g_hWeaponMachete;
-ConVar g_hWeaponRiotShield;
-ConVar g_hWeaponTonfa;
+ArrayList
+	g_aMeleeScripts,
+	g_aVersusWeapons;
 
-bool g_bSpawnedMelee;
+ConVar
+	g_hEnabled,
+	g_hSpawnType,
+	g_hRandomAmount,
+	g_hMapBaseAmount,
+	g_hMeleeItems[14];
 
-int g_iMeleeClassCount = 0;
-int g_iMeleeRandomSpawn[20];
-int g_iRound = 2;
+int
+	g_iRoundStart,
+	g_iPlayerSpawn,
+	g_iVersusRound = 2;
 
-char g_sMeleeClass[16][32];
+bool
+	g_bSpawnedMelee,
+	g_bFirstRound = true;
+
+static const char 
+	g_sMeleeModels[][] =
+	{
+		"models/weapons/melee/v_fireaxe.mdl",
+		"models/weapons/melee/w_fireaxe.mdl",
+		"models/weapons/melee/v_frying_pan.mdl",
+		"models/weapons/melee/w_frying_pan.mdl",
+		"models/weapons/melee/v_machete.mdl",
+		"models/weapons/melee/w_machete.mdl",
+		"models/weapons/melee/v_bat.mdl",
+		"models/weapons/melee/w_bat.mdl",
+		"models/weapons/melee/v_crowbar.mdl",
+		"models/weapons/melee/w_crowbar.mdl",
+		"models/weapons/melee/v_cricket_bat.mdl",
+		"models/weapons/melee/w_cricket_bat.mdl",
+		"models/weapons/melee/v_tonfa.mdl",
+		"models/weapons/melee/w_tonfa.mdl",
+		"models/weapons/melee/v_katana.mdl",
+		"models/weapons/melee/w_katana.mdl",
+		"models/weapons/melee/v_electric_guitar.mdl",
+		"models/weapons/melee/w_electric_guitar.mdl",
+		"models/v_models/v_knife_t.mdl",
+		"models/w_models/weapons/w_knife_t.mdl",
+		"models/weapons/melee/v_golfclub.mdl",
+		"models/weapons/melee/w_golfclub.mdl",
+		"models/weapons/melee/v_shovel.mdl",
+		"models/weapons/melee/w_shovel.mdl",
+		"models/weapons/melee/v_pitchfork.mdl",
+		"models/weapons/melee/w_pitchfork.mdl",
+		"models/weapons/melee/v_riotshield.mdl",
+		"models/weapons/melee/w_riotshield.mdl"
+	},
+	g_sMeleeName[][] =
+	{
+		"fireaxe",			//斧头
+		"frying_pan",		//平底锅
+		"machete",			//砍刀
+		"baseball_bat",		//棒球棒
+		"crowbar",			//撬棍
+		"cricket_bat",		//球拍
+		"tonfa",			//警棍
+		"katana",			//武士刀
+		"electric_guitar",	//吉他
+		"knife",			//小刀
+		"golfclub",			//高尔夫球棍
+		"shovel",			//铁铲
+		"pitchfork",		//草叉
+		"riotshield",		//盾牌
+	};
 
 public Plugin myinfo =
 {
-    name = "Melee In The Saferoom",
-    author = "N3wton",
-    description = "Spawns a selection of melee weapons in the saferoom, at the start of each round.",
-    version = VERSION
+	name = "Melee In The Saferoom",
+	author = "$atanic $pirit, N3wton, Enhanced",
+	description = "Spawns a selection of melee weapons in the saferoom, at the start of each round with Versus support.",
+	version = VERSION
 };
+
+public APLRes AskPluginLoad2(Handle myself, bool late, char[] error, int err_max)
+{
+    if(GetEngineVersion() != Engine_Left4Dead2)
+    {
+        strcopy(error, err_max, "Melee in the Saferoom only supports Left 4 Dead 2.");
+        return APLRes_SilentFailure;
+    }
+    return APLRes_Success;
+}
 
 public void OnPluginStart()
 {
-    char GameName[12];
-    GetGameFolderName(GameName, sizeof(GameName));
-    if( !StrEqual(GameName, "left4dead2") )
-        SetFailState( "Melee In The Saferoom is only supported on left 4 dead 2." );
-        
-    CreateConVar( "l4d2_MITSR_Version",     VERSION, "The version of Melee In The Saferoom"); 
-    g_hEnabled              = CreateConVar( "l4d2_MITSR_Enabled",       "1", "Should the plugin be enabled"); 
-    g_hWeaponRandom         = CreateConVar( "l4d2_MITSR_Random",        "0", "Spawn Random Weapons (1) or custom list (0)"); 
-    g_hWeaponRandomAmount   = CreateConVar( "l4d2_MITSR_Amount",        "2", "Number of weapons to spawn if l4d2_MITSR_Random is 1"); 
-    
+	g_aMeleeScripts = new ArrayList(64);
 
-    g_hWeaponBaseballBat    = CreateConVar( "l4d2_MITSR_BaseballBat",   "0", "Number of baseball bats to spawn (l4d2_MITSR_Random must be 0)");
-    g_hWeaponCricketBat     = CreateConVar( "l4d2_MITSR_CricketBat",    "0", "Number of cricket bats to spawn (l4d2_MITSR_Random must be 0)");
-    g_hWeaponCrowbar        = CreateConVar( "l4d2_MITSR_Crowbar",       "0", "Number of crowbars to spawn (l4d2_MITSR_Random must be 0)");
-    g_hWeaponElecGuitar     = CreateConVar( "l4d2_MITSR_ElecGuitar",    "0", "Number of electric guitars to spawn (l4d2_MITSR_Random must be 0)");
-    g_hWeaponFireAxe        = CreateConVar( "l4d2_MITSR_FireAxe",       "1", "Number of fireaxes to spawn (l4d2_MITSR_Random must be 0)");
-    g_hWeaponFryingPan      = CreateConVar( "l4d2_MITSR_FryingPan",     "0", "Number of frying pans to spawn (l4d2_MITSR_Random must be 0)");
-    g_hWeaponGolfClub       = CreateConVar( "l4d2_MITSR_GolfClub",      "0", "Number of golf clubs to spawn (l4d2_MITSR_Random must be 0)");
-    g_hWeaponKnife          = CreateConVar( "l4d2_MITSR_Knife",         "0", "Number of knifes to spawn (l4d2_MITSR_Random must be 0)");
-    g_hWeaponKatana         = CreateConVar( "l4d2_MITSR_Katana",        "1", "Number of katanas to spawn (l4d2_MITSR_Random must be 0)");
-    g_hWeaponMachete        = CreateConVar( "l4d2_MITSR_Machete",       "0", "Number of machetes to spawn (l4d2_MITSR_Random must be 0)");
-    g_hWeaponRiotShield     = CreateConVar( "l4d2_MITSR_RiotShield",    "0", "Number of riot shields to spawn (l4d2_MITSR_Random must be 0)");
-    g_hWeaponTonfa          = CreateConVar( "l4d2_MITSR_Tonfa",         "0", "Number of tonfas to spawn (l4d2_MITSR_Random must be 0)");
-    
-    HookEvent( "round_start", Event_RoundStart );
-    
-    RegAdminCmd("sm_melee", Command_SMMelee, ADMFLAG_KICK, "Lists all melee weapons spawnable in current campaign" );
-    
+	CreateConVar("l4d2_mitsr_version", VERSION, "The version of Melee In The Saferoom"); 
+	g_hEnabled = CreateConVar("l4d2_mitsr_enabled", "1", "是否启用插件", _, true, 0.0, true, 1.0);
+	g_hSpawnType = CreateConVar("l4d2_mitsr_spawn_type", "0", "0 = 自定义生成, 1 = 随机近战武器 2 = 基于地图设定的近战武器", _, true, 0.0, true, 2.0);
+	g_hRandomAmount	= CreateConVar("l4d2_mitsr_random_amount", "4","如果l4d2_mitsr_spawn_type为1，则随机在安全区生成多少近战武器", _, true, 0.0, true, 32.0);
+	g_hMapBaseAmount = CreateConVar("l4d2_mitsr_mapbase_amount", "4", "如果l4d2_mitsr_spawn_type为2，则在安全区生成多少近战武器", _, true, 0.0, true, 32.0);
+		
+	g_hMeleeItems[0] = CreateConVar("l4d2_mitsr_fireaxe", "1", "安全区生成多少斧头(l4d2_mitsr_spawn_type必须为0)", _, true, 0.0, true, 10.0);
+	g_hMeleeItems[1] = CreateConVar("l4d2_mitsr_fryingpan", "0", "安全区生成多少平底锅(l4d2_mitsr_spawn_type必须为0)", _, true, 0.0, true, 10.0);
+	g_hMeleeItems[2] = CreateConVar("l4d2_mitsr_machete", "1", "安全区生成多少砍刀(l4d2_mitsr_spawn_type必须为0)", _, true, 0.0, true, 10.0);
+	g_hMeleeItems[3] = CreateConVar("l4d2_mitsr_baseballbat", "0", "安全区生成多少棒球棒(l4d2_mitsr_spawn_type必须为0)", _, true, 0.0, true, 10.0);
+	g_hMeleeItems[4] = CreateConVar("l4d2_mitsr_crowbar", "0", "安全区生成多少撬棍(l4d2_mitsr_spawn_type必须为0)", _, true, 0.0, true, 10.0);
+	g_hMeleeItems[5] = CreateConVar("l4d2_mitsr_cricketbat", "0", "安全区生成多少球拍(l4d2_mitsr_spawn_type必须为0)", _, true, 0.0, true, 10.0);
+	g_hMeleeItems[6] = CreateConVar("l4d2_mitsr_tonfa", "0", "安全区生成多少警棍(l4d2_mitsr_spawn_type必须为0)", _, true, 0.0, true, 10.0);
+	g_hMeleeItems[7] = CreateConVar("l4d2_mitsr_katana", "1", "安全区生成多少武士刀(l4d2_mitsr_spawn_type必须为0)", _, true, 0.0, true, 10.0);
+	g_hMeleeItems[8] = CreateConVar("l4d2_mitsr_elecguitar", "0", "安全区生成多少吉他(l4d2_mitsr_spawn_type必须为0)", _, true, 0.0, true, 10.0);
+	g_hMeleeItems[9] = CreateConVar("l4d2_mitsr_knife", "1", "安全区生成多少小刀(l4d2_mitsr_spawn_type必须为0)", _, true, 0.0, true, 10.0);
+	g_hMeleeItems[10] = CreateConVar("l4d2_mitsr_golfclub", "0", "安全区生成多少高尔夫球棍(l4d2_mitsr_spawn_type必须为0)", _, true, 0.0, true, 10.0);
+	g_hMeleeItems[11] = CreateConVar("l4d2_mitsr_shovel", "0", "安全区生成多少铁铲(l4d2_mitsr_spawn_type必须为0)", _, true, 0.0, true, 10.0);
+	g_hMeleeItems[12] = CreateConVar("l4d2_mitsr_pitchfork", "0", "安全区生成多少草叉(l4d2_mitsr_spawn_type必须为0)", _, true, 0.0, true, 10.0);
+	g_hMeleeItems[13] = CreateConVar("l4d2_mitsr_riotshield", "0", "安全区生成多少盾牌(l4d2_mitsr_spawn_type必须为0)", _, true, 0.0, true, 10.0);
+	
+	//AutoExecConfig(true, "l4d2_melee_in_the_saferoom");
+	
+	HookEvent("round_end", Event_RoundEnd, EventHookMode_PostNoCopy);
+	HookEvent("round_start", Event_RoundStart, EventHookMode_PostNoCopy);
+	HookEvent("player_spawn", Event_PlayerSpawn, EventHookMode_PostNoCopy);
 
-    //AutoExecConfig(true, "l4d2_melee_saferoom");
+	RegAdminCmd("sm_melee",	cmdMelee, ADMFLAG_KICK, "列出当前战役中可产生的所有近战武器"); 
 }
 
-public Action Command_SMMelee(int client, int args)
-{
-    for( int i = 0; i < g_iMeleeClassCount; i++ )
-    {
-        PrintToChat( client, "%d : %s", i, g_sMeleeClass[i] );
-    }
-    return Plugin_Handled;
+Action cmdMelee(int client, int args)
+{	
+	if(g_iRoundStart == 0 || g_iPlayerSpawn == 0)
+		ReplyToCommand(client, "地图尚未开始");
+	else
+	{
+		ReplyToCommand(client, "当前地图已解锁近战:");
+
+		char sScriptName[64];
+		int iLength = g_aMeleeScripts.Length;
+		for(int i; i < iLength; i++)
+		{
+			g_aMeleeScripts.GetString(i, sScriptName, sizeof sScriptName);
+			ReplyToCommand(client, "%d : %s", i, sScriptName);
+		}
+	}
+
+	return Plugin_Handled;
 }
 
 public void OnMapStart()
 {
-    PrecacheModel( "models/weapons/melee/v_bat.mdl", true );
-    PrecacheModel( "models/weapons/melee/v_cricket_bat.mdl", true );
-    PrecacheModel( "models/weapons/melee/v_crowbar.mdl", true );
-    PrecacheModel( "models/weapons/melee/v_electric_guitar.mdl", true );
-    PrecacheModel( "models/weapons/melee/v_fireaxe.mdl", true );
-    PrecacheModel( "models/weapons/melee/v_frying_pan.mdl", true );
-    PrecacheModel( "models/weapons/melee/v_golfclub.mdl", true );
-    PrecacheModel( "models/weapons/melee/v_katana.mdl", true );
-    PrecacheModel( "models/weapons/melee/v_machete.mdl", true );
-    PrecacheModel( "models/weapons/melee/v_tonfa.mdl", true );
-    PrecacheModel( "models/weapons/melee/v_riotshield.mdl", true );
-	PrecacheModel( "models/weapons/melee/v_knife_t.mdl", true );
-	PrecacheModel( "models/weapons/melee/v_shovel.mdl", true );
-	PrecacheModel( "models/weapons/melee/v_pitchfork.mdl", true );
+	int i;
+	int iLength = sizeof g_sMeleeModels;
+	for(; i < iLength; i++)
+	{
+		if(!IsModelPrecached(g_sMeleeModels[i]))
+			PrecacheModel(g_sMeleeModels[i], true);
+	}
+
+	iLength = sizeof g_sMeleeName;
+	char sBuffer[64];
+	for(i = 0; i < iLength; i++)
+	{
+		FormatEx(sBuffer, sizeof sBuffer, "scripts/melee/%s.txt", g_sMeleeName[i]);
+		if(!IsGenericPrecached(sBuffer))
+			PrecacheGeneric(sBuffer, true);
+	}
 	
-    PrecacheModel( "models/weapons/melee/w_bat.mdl", true );
-    PrecacheModel( "models/weapons/melee/w_cricket_bat.mdl", true );
-    PrecacheModel( "models/weapons/melee/w_crowbar.mdl", true );
-    PrecacheModel( "models/weapons/melee/w_electric_guitar.mdl", true );
-    PrecacheModel( "models/weapons/melee/w_fireaxe.mdl", true );
-    PrecacheModel( "models/weapons/melee/w_frying_pan.mdl", true );
-    PrecacheModel( "models/weapons/melee/w_golfclub.mdl", true );
-    PrecacheModel( "models/weapons/melee/w_katana.mdl", true );
-    PrecacheModel( "models/weapons/melee/w_machete.mdl", true );
-    PrecacheModel( "models/weapons/melee/w_tonfa.mdl", true );
-
-    
-    PrecacheGeneric( "scripts/melee/baseball_bat.txt", true );
-    PrecacheGeneric( "scripts/melee/cricket_bat.txt", true );
-    PrecacheGeneric( "scripts/melee/crowbar.txt", true );
-    PrecacheGeneric( "scripts/melee/electric_guitar.txt", true );
-    PrecacheGeneric( "scripts/melee/fireaxe.txt", true );
-    PrecacheGeneric( "scripts/melee/frying_pan.txt", true );
-    PrecacheGeneric( "scripts/melee/golfclub.txt", true );
-    PrecacheGeneric( "scripts/melee/katana.txt", true );
-    PrecacheGeneric( "scripts/melee/machete.txt", true );
-    PrecacheGeneric( "scripts/melee/tonfa.txt", true );
-	PrecacheGeneric( "scripts/melee/riot_shield.txt", true );
+	// 额外预缓存一些特殊脚本
+	PrecacheGeneric("scripts/melee/huntingknife.txt", true);
+	PrecacheGeneric("scripts/melee/riot_shield.txt", true);
 	
-    int index = CreateEntityByName("weapon_sniper_scout");
-    if(index != -1)
-    {
-        DispatchSpawn(index);
-        RemoveEntity(index);
-    }
+	vGetMeleeWeaponsStringTable();
 }
 
-public Action Event_RoundStart(Event event, const char[] name, bool dontBroadcast)
+void vGetMeleeWeaponsStringTable()
 {
-    if( !g_hEnabled.BoolValue ) 
-        return Plugin_Continue;
-    
-    g_bSpawnedMelee = false;
-    
-    if( g_iRound == 2 && IsVersus() ) 
-        g_iRound = 1; 
-    else 
-        g_iRound = 2;
-    
-    GetMeleeClasses();
-    
-    CreateTimer( 1.0, Timer_SpawnMelee );
-    
-    return Plugin_Continue;
+	g_aMeleeScripts.Clear();
+
+	int iTable = FindStringTable("meleeweapons");
+	if(iTable != INVALID_STRING_TABLE)
+	{
+		int iNum = GetStringTableNumStrings(iTable);
+		char sMeleeName[64];
+		for(int i; i < iNum; i++)
+		{
+			ReadStringTable(iTable, i, sMeleeName, sizeof sMeleeName);
+			g_aMeleeScripts.PushString(sMeleeName);
+		}
+	}
 }
 
-public Action Timer_SpawnMelee( Handle timer )
+public void OnMapEnd()
 {
-    int client = GetInGameClient();
-
-    if( client != 0 && !g_bSpawnedMelee )
-    {
-        float SpawnPosition[3], SpawnAngle[3];
-        GetClientAbsOrigin( client, SpawnPosition );
-        SpawnPosition[2] += 20.0; 
-        SpawnAngle[0] = 90.0;
-        
-        if( g_hWeaponRandom.BoolValue )
-        {
-            int weaponAmount = g_hWeaponRandomAmount.IntValue;
-            for(int i = 0; i < weaponAmount; i++)
-            {
-                int RandomMelee = GetRandomInt( 0, g_iMeleeClassCount-1 );
-                if( IsVersus() && g_iRound == 2 ) 
-                    RandomMelee = g_iMeleeRandomSpawn[i]; 
-                SpawnMelee( g_sMeleeClass[RandomMelee], SpawnPosition, SpawnAngle );
-                if( IsVersus() && g_iRound == 1 ) 
-                    g_iMeleeRandomSpawn[i] = RandomMelee;
-            }
-            g_bSpawnedMelee = true;
-        }
-        else
-        {
-            SpawnCustomList( SpawnPosition, SpawnAngle );
-            g_bSpawnedMelee = true;
-        }
-    }
-    else
-    {
-        if( !g_bSpawnedMelee ) 
-            CreateTimer( 1.0, Timer_SpawnMelee );
-    }
-    return Plugin_Stop;
+	g_iRoundStart = 0;
+	g_iPlayerSpawn = 0;
+	g_bSpawnedMelee = false;
+	g_bFirstRound = true;
+	g_iVersusRound = 2;
+	
+	if(g_aVersusWeapons != null)
+	{
+		delete g_aVersusWeapons;
+		g_aVersusWeapons = null;
+	}
 }
 
-void SpawnCustomList( float Position[3], float Angle[3] )
+void Event_RoundEnd(Event event, const char[] name, bool dontBroadcast)
 {
-    char ScriptName[32];
-    
-    //Spawn Baseball Bats
-    int batCount = g_hWeaponBaseballBat.IntValue;
-    if( batCount > 0 )
-    {
-        for( int i = 0; i < batCount; i++ )
-        {
-            GetScriptName( "baseball_bat", ScriptName, sizeof(ScriptName) );
-            SpawnMelee( ScriptName, Position, Angle );
-        }
-    }
-    
-    //Spawn Cricket Bats
-    int cricketBatCount = g_hWeaponCricketBat.IntValue;
-    if( cricketBatCount > 0 )
-    {
-        for( int i = 0; i < cricketBatCount; i++ )
-        {
-            GetScriptName( "cricket_bat", ScriptName, sizeof(ScriptName) );
-            SpawnMelee( ScriptName, Position, Angle );
-        }
-    }
-    
-    //Spawn Crowbars
-    int crowbarCount = g_hWeaponCrowbar.IntValue;
-    if( crowbarCount > 0 )
-    {
-        for( int i = 0; i < crowbarCount; i++ )
-        {
-            GetScriptName( "crowbar", ScriptName, sizeof(ScriptName) );
-            SpawnMelee( ScriptName, Position, Angle );
-        }
-    }
-    
-    //Spawn Electric Guitars
-    int guitarCount = g_hWeaponElecGuitar.IntValue;
-    if( guitarCount > 0 )
-    {
-        for( int i = 0; i < guitarCount; i++ )
-        {
-            GetScriptName( "electric_guitar", ScriptName, sizeof(ScriptName) );
-            SpawnMelee( ScriptName, Position, Angle );
-        }
-    }
-    
-    //Spawn Fireaxes
-    int axeCount = g_hWeaponFireAxe.IntValue;
-    if( axeCount > 0 )
-    {
-        for( int i = 0; i < axeCount; i++ )
-        {
-            GetScriptName( "fireaxe", ScriptName, sizeof(ScriptName) );
-            SpawnMelee( ScriptName, Position, Angle );
-        }
-    }
-    
-    //Spawn Frying Pans
-    int panCount = g_hWeaponFryingPan.IntValue;
-    if( panCount > 0 )
-    {
-        for( int i = 0; i < panCount; i++ )
-        {
-            GetScriptName( "frying_pan", ScriptName, sizeof(ScriptName) );
-            SpawnMelee( ScriptName, Position, Angle );
-        }
-    }
-    
-    //Spawn Golfclubs
-    int golfCount = g_hWeaponGolfClub.IntValue;
-    if( golfCount > 0 )
-    {
-        for( int i = 0; i < golfCount; i++ )
-        {
-            GetScriptName( "golfclub", ScriptName, sizeof(ScriptName) );
-            SpawnMelee( ScriptName, Position, Angle );
-        }
-    }
-    
-    //Spawn Knifes
-    int knifeCount = g_hWeaponKnife.IntValue;
-    if( knifeCount > 0 )
-    {
-        for( int i = 0; i < knifeCount; i++ )
-        {
-            GetScriptName( "hunting_knife", ScriptName, sizeof(ScriptName) );
-            SpawnMelee( ScriptName, Position, Angle );
-        }
-    }
-    
-    //Spawn Katanas
-    int katanaCount = g_hWeaponKatana.IntValue;
-    if( katanaCount > 0 )
-    {
-        for( int i = 0; i < katanaCount; i++ )
-        {
-            GetScriptName( "katana", ScriptName, sizeof(ScriptName) );
-            SpawnMelee( ScriptName, Position, Angle );
-        }
-    }
-    
-    //Spawn Machetes
-    int macheteCount = g_hWeaponMachete.IntValue;
-    if( macheteCount > 0 )
-    {
-        for( int i = 0; i < macheteCount; i++ )
-        {
-            GetScriptName( "machete", ScriptName, sizeof(ScriptName) );
-            SpawnMelee( ScriptName, Position, Angle );
-        }
-    }
-    
-    //Spawn RiotShields
-    int shieldCount = g_hWeaponRiotShield.IntValue;
-    if( shieldCount > 0 )
-    {
-        for( int i = 0; i < shieldCount; i++ )
-        {
-            GetScriptName( "riotshield", ScriptName, sizeof(ScriptName) );
-            SpawnMelee( ScriptName, Position, Angle );
-        }
-    }
-    
-    //Spawn Tonfas
-    int tonfaCount = g_hWeaponTonfa.IntValue;
-    if( tonfaCount > 0 )
-    {
-        for( int i = 0; i < tonfaCount; i++ )
-        {
-            GetScriptName( "tonfa", ScriptName, sizeof(ScriptName) );
-            SpawnMelee( ScriptName, Position, Angle );
-        }
-    }
+	OnMapEnd();
 }
 
-void SpawnMelee( const char[] Class, float Position[3], float Angle[3] )
+void Event_PlayerSpawn(Event event, const char[] name, bool dontBroadcast)
 {
-    float SpawnPosition[3], SpawnAngle[3];
-    SpawnPosition = Position;
-    SpawnAngle = Angle;
-    
-    SpawnPosition[0] += float( -10 + GetRandomInt( 0, 20 ) );
-    SpawnPosition[1] += float( -10 + GetRandomInt( 0, 20 ) );
-    SpawnPosition[2] += float( GetRandomInt( 0, 10 ) );
-    SpawnAngle[1] = GetRandomFloat( 0.0, 360.0 );
-
-    int MeleeSpawn = CreateEntityByName( "weapon_melee" );
-    if(MeleeSpawn != -1)
-    {
-        DispatchKeyValue( MeleeSpawn, "melee_script_name", Class );
-        DispatchSpawn( MeleeSpawn );
-        TeleportEntity(MeleeSpawn, SpawnPosition, SpawnAngle, NULL_VECTOR );
-    }
+	if(g_iRoundStart == 1 && g_iPlayerSpawn == 0)
+		CreateTimer(1.0, tmrStartSpawnMelee, _, TIMER_FLAG_NO_MAPCHANGE);
+	g_iPlayerSpawn = 1;
 }
 
-void GetMeleeClasses()
+void Event_RoundStart(Event event, const char[] name, bool dontBroadcast)
 {
-    int MeleeStringTable = FindStringTable( "MeleeWeapons" );
-    if(MeleeStringTable != INVALID_STRING_TABLE)
-    {
-        g_iMeleeClassCount = GetStringTableNumStrings( MeleeStringTable );
-        
-        for( int i = 0; i < g_iMeleeClassCount; i++ )
-        {
-            ReadStringTable( MeleeStringTable, i, g_sMeleeClass[i], 32 );
-        }
-    }
+	if(!g_hEnabled.BoolValue) 
+		return;
+		
+	g_bSpawnedMelee = false;
+	
+	// Versus模式回合管理
+	if(IsVersus()) 
+	{
+		if(g_iVersusRound == 2) 
+			g_iVersusRound = 1; 
+		else 
+			g_iVersusRound = 2;
+	}
+	
+	if(g_iRoundStart == 0 && g_iPlayerSpawn == 1)
+		CreateTimer(1.0, tmrStartSpawnMelee, _, TIMER_FLAG_NO_MAPCHANGE);
+	g_iRoundStart = 1;
 }
 
-void GetScriptName( const char[] Class, char[] ScriptName, int maxlength )
+Action tmrStartSpawnMelee(Handle timer)
 {
-    for( int i = 0; i < g_iMeleeClassCount; i++ )
-    {
-        if( StrContains( g_sMeleeClass[i], Class, false ) == 0 )
-        {
-            strcopy( ScriptName, maxlength, g_sMeleeClass[i] );
-            return;
-        }
-    }
-    if(g_iMeleeClassCount > 0)
-        strcopy( ScriptName, maxlength, g_sMeleeClass[0] );
+	vStartSpawnMelee();
+	return Plugin_Continue;
 }
 
-int GetInGameClient()
+void vStartSpawnMelee()
 {
-    for( int x = 1; x <= MaxClients; x++ )
-    {
-        if( IsClientInGame( x ) && GetClientTeam( x ) == 2 )
-        {
-            return x;
-        }
-    }
-    return 0;
+	if(!g_hEnabled.BoolValue) 
+		return;
+
+	int client = ivGetInGameClient();
+	if(!client)
+		return;
+
+	if(g_bSpawnedMelee)
+		return;
+
+	int iLimit;
+	float vOrigin[3]; 
+	float vAngles[3];
+	GetClientAbsOrigin(client, vOrigin);
+
+	vOrigin[2] += 20.0;
+	vAngles[0] = 90.0;
+
+	int iLength = g_aMeleeScripts.Length;
+	if(g_hSpawnType.IntValue == 1)
+	{
+		static ArrayList aRandomMelee;
+
+		// Versus模式特殊处理
+		if(IsVersus())
+		{
+			if(g_iVersusRound == 1 && g_bFirstRound)
+			{
+				if(aRandomMelee != null) delete aRandomMelee;
+				if(g_aVersusWeapons != null) delete g_aVersusWeapons;
+				
+				aRandomMelee = g_aMeleeScripts.Clone();
+				aRandomMelee.Sort(Sort_Random, Sort_String);
+				g_aVersusWeapons = aRandomMelee.Clone();
+				g_bFirstRound = false;
+			}
+			else if(g_iVersusRound == 2)
+			{
+				if(g_aVersusWeapons != null)
+					aRandomMelee = g_aVersusWeapons.Clone();
+				else
+				{
+					aRandomMelee = g_aMeleeScripts.Clone();
+					aRandomMelee.Sort(Sort_Random, Sort_String);
+				}
+			}
+		}
+		else
+		{
+			if(bIsGameInFirstHalf())
+			{
+				if(aRandomMelee != null)
+					delete aRandomMelee;
+
+				aRandomMelee = g_aMeleeScripts.Clone();
+				aRandomMelee.Sort(Sort_Random, Sort_String);
+			}
+		}
+
+		char sScriptName[64];
+		iLimit = g_hRandomAmount.IntValue;
+		for(int i; i < iLimit; i++)
+		{
+			aRandomMelee.GetString(i < iLength ? i : GetRandomInt(0, iLength - 1), sScriptName, sizeof sScriptName);
+			vSpawnMelee(sScriptName, vOrigin, vAngles);
+		}
+	}
+	else if(g_hSpawnType.IntValue == 2)
+	{
+		char sScriptName[64];
+		iLimit = g_hMapBaseAmount.IntValue;
+		for(int i; i < iLimit; i++)
+		{
+			g_aMeleeScripts.GetString(i < iLength ? i : i - (RoundToFloor(float(i / iLength)) * iLength), sScriptName, sizeof sScriptName);
+			vSpawnMelee(sScriptName, vOrigin, vAngles);
+		}
+	}
+	else
+		vSpawnCustomList(vOrigin, vAngles);
+		
+	g_bSpawnedMelee = true;
+}
+
+void vSpawnMelee(const char[] sClass, const float vPos[3], const float vAng[3])
+{
+	float vOrigin[3];
+	float vAngles[3];
+	vOrigin = vPos;
+	vAngles = vAng;
+	
+	vOrigin[0] += (-10.0 + GetRandomFloat(0.0, 20.0));
+	vOrigin[1] += (-10.0 + GetRandomFloat(0.0, 20.0));
+	vOrigin[2] += GetRandomFloat(0.0, 10.0);
+	vAngles[1] = GetRandomFloat(0.0, 360.0);
+
+	int entity = CreateEntityByName("weapon_melee");
+	if(entity != -1)
+	{
+		DispatchKeyValue(entity, "solid", "6");
+		DispatchKeyValue(entity, "melee_script_name", sClass);
+		DispatchSpawn(entity);
+		TeleportEntity(entity, vOrigin, vAngles, NULL_VECTOR);
+	}
+}
+
+void vSpawnCustomList(const float vPos[3], const float vAng[3])
+{
+	char sScriptName[64];
+	int iLength = sizeof g_hMeleeItems;
+	for(int x; x < iLength; x++)
+	{
+		for(int i; i < g_hMeleeItems[x].IntValue; i++)
+		{
+			if(g_aMeleeScripts.FindString(g_sMeleeName[x]) != -1)
+				strcopy(sScriptName, sizeof sScriptName, g_sMeleeName[x]);
+			else
+			{
+				// 特殊处理一些武器名称映射
+				if(StrEqual(g_sMeleeName[x], "knife"))
+				{
+					if(g_aMeleeScripts.FindString("huntingknife") != -1)
+						strcopy(sScriptName, sizeof sScriptName, "huntingknife");
+					else
+						g_aMeleeScripts.GetString(GetRandomInt(0, g_aMeleeScripts.Length - 1), sScriptName, sizeof sScriptName);
+				}
+				else if(StrEqual(g_sMeleeName[x], "riotshield"))
+				{
+					if(g_aMeleeScripts.FindString("riot_shield") != -1)
+						strcopy(sScriptName, sizeof sScriptName, "riot_shield");
+					else
+						g_aMeleeScripts.GetString(GetRandomInt(0, g_aMeleeScripts.Length - 1), sScriptName, sizeof sScriptName);
+				}
+				else
+					g_aMeleeScripts.GetString(GetRandomInt(0, g_aMeleeScripts.Length - 1), sScriptName, sizeof sScriptName);
+			}
+	
+			vSpawnMelee(sScriptName, vPos, vAng);
+		}
+	}
+}
+
+int ivGetInGameClient()
+{
+	for(int i = 1; i <= MaxClients; i++)
+	{
+		if(IsClientInGame(i) && GetClientTeam(i) == 2 && IsPlayerAlive(i))
+			return i;
+	}
+	return 0;
+}
+
+bool bIsGameInFirstHalf()
+{
+	return GameRules_GetProp("m_bInSecondHalfOfRound") ? false : true;
 }
 
 bool IsVersus()
 {
-    char GameMode[32];
-    ConVar gamemodeConvar = FindConVar( "mp_gamemode" );
-    if(gamemodeConvar != null)
-    {
-        gamemodeConvar.GetString( GameMode, sizeof(GameMode) );
-        if( StrContains( GameMode, "versus", false ) != -1 ) 
-            return true;
-    }
-    return false;
+	char GameMode[32];
+	ConVar gamemodeConvar = FindConVar("mp_gamemode");
+	if(gamemodeConvar != null)
+	{
+		gamemodeConvar.GetString(GameMode, sizeof(GameMode));
+		return (StrContains(GameMode, "versus", false) != -1);
+	}
+	return false;
 }
