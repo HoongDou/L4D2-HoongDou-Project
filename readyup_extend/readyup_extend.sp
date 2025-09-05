@@ -11,10 +11,6 @@
 
 #define L4DTeam_Survivor 2
 
-// Native functions from readyup plugin
-native bool IsInReady();
-native bool IsReady(int client);
-
 // ====================================================================================================
 // >> GLOBAL VARIABLES
 // ====================================================================================================
@@ -32,7 +28,7 @@ public Plugin myinfo =
     name = "ReadyUp Extension",
     author = "HoongDou",
     description = "Extends the L4D2 Ready-Up plugin with a highly robust auto-start and a universal sm_fs command.",
-    version = "1.5",
+    version = "1.6",
     url = "https://github.com/HoongDou/L4D2-HoongDou-Project"
 };
 
@@ -185,7 +181,7 @@ public Action Timer_CheckReady(Handle timer)
 /**
  * @brief  延迟移除临时管理员权限
  * @param  timer 定时器句柄
- * @param  dp    数据包，包含客户端信息和管理员ID
+ * @param  dp    数据包，包含客户端信息和权限状态
  * @return 停止定时器
  */
 public Action Timer_RemoveAdmin(Handle timer, DataPack dp)
@@ -193,26 +189,35 @@ public Action Timer_RemoveAdmin(Handle timer, DataPack dp)
     dp.Reset();
     int client = GetClientOfUserId(dp.ReadCell());
     AdminId tempAdminId = view_as<AdminId>(dp.ReadCell());
-    bool tempAdmin = dp.ReadCell();
+    bool isTempAdmin = dp.ReadCell();
+    bool hadOriginalBanPermission = dp.ReadCell();
 
-    if (client > 0)
+    if (client > 0 && IsClientInGame(client))
     {
         AdminId admin = GetUserAdmin(client);
         if (admin != INVALID_ADMIN_ID)
         {
-            SetAdminFlag(admin, Admin_Ban, false); // 移除ban权限
-            
-            // 如果是临时管理员，则完全移除
-            if (tempAdmin && tempAdminId != INVALID_ADMIN_ID)
+            if (isTempAdmin)
             {
-                SetUserAdmin(client, INVALID_ADMIN_ID, false); // 移除客户端的管理员身份
-                RemoveAdmin(tempAdminId); // 删除管理员对象
+                // 临时管理员：完全移除管理员身份
+                SetUserAdmin(client, INVALID_ADMIN_ID, false);
+                if (tempAdminId != INVALID_ADMIN_ID)
+                {
+                    RemoveAdmin(tempAdminId);
+                }
             }
+            else if (!hadOriginalBanPermission)
+            {
+                // 原有管理员但原本没有Ban权限：只移除Ban权限
+                SetAdminFlag(admin, Admin_Ban, false);
+            }
+            // 如果是原有管理员且原本就有Ban权限，则不做任何操作
         }
     }
 
     return Plugin_Stop;
 }
+
 
 // ====================================================================================================
 // >> READYUP PLUGIN CALLBACKS
@@ -265,10 +270,19 @@ public Action Command_ForceStart(int client, int args)
     }
 
     AdminId admin = GetUserAdmin(client);
-    bool tempAdmin = false;
+    bool isOriginalAdmin = (admin != INVALID_ADMIN_ID);  // 是否为原有管理员
+    bool hadBanPermission = false;  // 是否原本就有Ban权限
+    bool needsCleanup = false;      // 是否需要清理权限
+    AdminId tempAdminId = INVALID_ADMIN_ID;  // 临时管理员ID
 
-    // 如果玩家没有管理员权限，创建临时管理员
-    if (admin == INVALID_ADMIN_ID)
+    // 检查原本是否有Ban权限
+    if (isOriginalAdmin)
+    {
+        hadBanPermission = GetAdminFlag(admin, Admin_Ban);
+    }
+
+    // 如果没有管理员权限，创建临时管理员
+    if (!isOriginalAdmin)
     {
         admin = CreateAdmin();
         if (admin == INVALID_ADMIN_ID)
@@ -277,10 +291,17 @@ public Action Command_ForceStart(int client, int args)
             return Plugin_Handled;
         }
         SetUserAdmin(client, admin, false);
-        tempAdmin = true;
+        tempAdminId = admin;
+        needsCleanup = true;
     }
 
-    // 检查并添加ban权限（执行forcestart需要此权限）
+    // 如果是原有管理员但没有Ban权限，需要临时添加
+    else if (!hadBanPermission)
+    {
+        needsCleanup = true;
+    }
+
+    // 确保有Ban权限（执行forcestart需要此权限）
     if (!GetAdminFlag(admin, Admin_Ban))
     {
         SetAdminFlag(admin, Admin_Ban, true);
@@ -289,12 +310,16 @@ public Action Command_ForceStart(int client, int args)
     PrintToChatAll(" \x04[!] \x05%N \x01发起了强制开始！", client);
     FakeClientCommand(client, "sm_forcestart");
 
-    // 延迟移除权限，避免命令执行时权限被立即撤销
-    DataPack dp;
-    CreateDataTimer(0.2, Timer_RemoveAdmin, dp);
-    dp.WriteCell(GetClientUserId(client));
-    dp.WriteCell(tempAdmin ? admin : INVALID_ADMIN_ID);
-    dp.WriteCell(tempAdmin);
+    // 如果需要清理权限，延迟执行
+    if (needsCleanup)
+    {
+        DataPack dp;
+        CreateDataTimer(0.2, Timer_RemoveAdmin, dp);
+        dp.WriteCell(GetClientUserId(client));
+        dp.WriteCell(tempAdminId);  // 临时管理员ID（如果是临时的）
+        dp.WriteCell(!isOriginalAdmin);  // 是否为临时管理员
+        dp.WriteCell(hadBanPermission);  // 是否原本就有Ban权限
+    }
 
     return Plugin_Handled;
 }
