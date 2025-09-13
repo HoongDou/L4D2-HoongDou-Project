@@ -2,11 +2,15 @@
 #include <adminmenu>
 #include <l4d2_source_keyvalues>
 #include <left4dhooks>
+#include <localizer>
 
 #pragma semicolon 1
 #pragma newdecls required
 
-#define PLUGIN_VERSION "1.3.0"
+#define PLUGIN_VERSION "1.5.1"
+
+#define TRANSLATION_MISSIONS	"missions.phrases.txt"
+#define TRANSLATION_CHAPTERS	"chapters.phrases.txt"
 
 // --- 全局变量 ---
 TopMenu g_TopMenu_AdminMenu;
@@ -19,6 +23,9 @@ char g_sCurrentGameMode[32];
 bool g_bMapChanger_L4D2Changelevel;
 bool g_bMapChanger_MapChanger;
 bool g_bLastMenuIsOfficial[MAXPLAYERS + 1];
+bool g_bLocalizerReady;
+
+Localizer g_loc;
 
 // --- 插件信息 ---
 public Plugin myinfo = {
@@ -69,29 +76,81 @@ public void OnPluginStart() {
     LoadTranslations("common.phrases");
     LoadTranslations("l4d2_mm_adminmenu.phrases");
 
-    Init_GameData();
+    if (!Init_GameData()) {
+        SetFailState("Failed to initialize game data");
+        return;
+    }
 
+    Init_ExcludeList();
+    Init_ConVars();
+    Init_Commands();
+    
+    TopMenu topmenu;
+    if (LibraryExists("adminmenu") && (topmenu = GetAdminTopMenu()) != null) {
+        OnAdminMenuReady(topmenu);
+    }
+
+    // 初始化 Localizer
+    if (LibraryExists("localizer")) {
+        Init_Localizer();
+    } else {
+        LogMessage("Localizer not found, using fallback translation method");
+        // 延迟生成翻译文件
+        CreateTimer(3.0, Timer_GenerateTranslations);
+    }
+}
+
+void Init_ExcludeList() {
     g_smExclude = new StringMap();
     g_smExclude.SetValue("credits", 1);
     g_smExclude.SetValue("holdoutchallenge", 1);
     g_smExclude.SetValue("holdouttraining", 1);
     g_smExclude.SetValue("parishdash", 1);
     g_smExclude.SetValue("shootzones", 1);
+}
 
-    g_cvMPGameMode = FindConVar("mp_gamemode"); 
-    g_cvMPGameMode.AddChangeHook(OnGameModeChanged);
-    UpdateCurrentGameMode();
-
-    TopMenu topmenu;
-    if (LibraryExists("adminmenu") && (topmenu = GetAdminTopMenu()) != null) {
-        OnAdminMenuReady(topmenu);
+void Init_ConVars() {
+    g_cvMPGameMode = FindConVar("mp_gamemode");
+    if (g_cvMPGameMode != null) {
+        g_cvMPGameMode.AddChangeHook(OnGameModeChanged);
+        UpdateCurrentGameMode();
     }
+}
 
+void Init_Commands() {
     RegAdminCmd("sm_vpk_reload", Cmd_ReloadMissions, ADMFLAG_RCON, "Reloads VPKs and mission list.");
+    RegAdminCmd("sm_adminmap_gentrans", Cmd_GenerateTranslations, ADMFLAG_RCON, "Force regenerates map translation files.");
+}
+
+// 直接调用初始化
+void Init_Localizer() {
+    g_loc = new Localizer();
+    if (g_loc == null) {
+        LogError("Failed to create Localizer instance");
+        return;
+    }
+    
+    // 直接标记为准备好并生成翻译文件
+    g_bLocalizerReady = true;
+    CreateTimer(1.0, Timer_GenerateTranslations);
 }
 
 public void OnMapStart() {
     UpdateCurrentGameMode();
+}
+
+/**
+ * 当 Localizer 准备好后，开始生成地图翻译文件
+ */
+public void OnPhrasesReady() {
+    LogMessage("Localizer is ready. Generating map and mission translation files...");
+    g_bLocalizerReady = true;
+    GenerateTranslationFiles();
+}
+
+public Action Timer_GenerateTranslations(Handle timer) {
+    GenerateTranslationFiles();
+    return Plugin_Continue;
 }
 
 public void OnAdminMenuReady(Handle hTopMenu) {
@@ -105,15 +164,14 @@ public void OnAdminMenuReady(Handle hTopMenu) {
     if (topmenu == g_TopMenu_AdminMenu) {
         return;
     }
+    
     g_TopMenu_AdminMenu = topmenu;
-    PrintToServer("[Admin Mission Menu] OnAdminMenuReady fired, registering menu item.");
-
     TopMenuObject server_commands = FindTopMenuCategory(topmenu, ADMINMENU_SERVERCOMMANDS);
     if (server_commands != INVALID_TOPMENUOBJECT) {
         AddToTopMenu(topmenu, "l4d2_switch_map", TopMenuObject_Item, AdminMenu_MainHandler, server_commands, "l4d2_switch_map_access", ADMFLAG_CHANGEMAP);
-        PrintToServer("[Admin Mission Menu] Item 'l4d2_switch_map' added to menu.");
+        PrintToServer("[Admin Mission Menu] Menu item added successfully.");
     } else {
-        PrintToServer("[Admin Mission Menu] Warning: Could not find ADMINMENU_SERVERCOMMANDS category.");
+        PrintToServer("[Admin Mission Menu] Warning: Could not find server commands category.");
     }
 }
 
@@ -129,6 +187,10 @@ public void AdminMenu_MainHandler(TopMenu topmenu, TopMenuAction action, TopMenu
  * 菜单1: 选择地图类型 (官方/三方)
  */
 void Display_MapTypeMenu(int client) {
+    if (!IsClientValid(client)) {
+        return;
+    }
+    
     Menu menu = new Menu(MenuHandler_MapType);
     menu.SetTitle("%T", "Switch Map/Mission", client);
 
@@ -150,7 +212,7 @@ public int MenuHandler_MapType(Menu menu, MenuAction action, int client, int cho
         bool isOfficial = StrEqual(info, "official");
         Display_MissionListMenu(client, isOfficial);
     } else if (action == MenuAction_Cancel) {
-        if (choice == MenuCancel_ExitBack) {
+        if (choice == MenuCancel_ExitBack && g_TopMenu_AdminMenu != null) {
             DisplayTopMenu(g_TopMenu_AdminMenu, client, TopMenuPosition_LastCategory);
         }
     } else if (action == MenuAction_End) {
@@ -163,34 +225,51 @@ public int MenuHandler_MapType(Menu menu, MenuAction action, int client, int cho
  * 菜单2: 显示战役列表 (根据官方/三方筛选)
  */
 void Display_MissionListMenu(int client, bool official) {
+    if (!IsClientValid(client)) {
+        return;
+    }
+    
     Menu menu = new Menu(MenuHandler_MissionList);
     menu.SetTitle("%T", official ? "Official Missions" : "Addon Missions", client);
     g_bLastMenuIsOfficial[client] = official;
 
     SourceKeyValues kvMissions = SDKCall(g_hSDK_GetAllMissions, g_pMatchExtL4D);
     if (kvMissions.IsNull()) {
+        PrintToChat(client, "[SM] Failed to get mission list.");
         delete menu;
         return;
     }
 
+    int itemCount = 0;
     char missionName[64], displayTitle[128];
+    
     for (SourceKeyValues kvSub = kvMissions.GetFirstTrueSubKey(); !kvSub.IsNull(); kvSub = kvSub.GetNextTrueSubKey()) {
         kvSub.GetName(missionName, sizeof(missionName));
-        if (g_smExclude.ContainsKey(missionName)) continue;
+        if (g_smExclude.ContainsKey(missionName)) {
+            continue;
+        }
 
         char modePath[128];
         Format(modePath, sizeof(modePath), "modes/%s", g_sCurrentGameMode);
-        if (kvSub.FindKey(modePath).IsNull()) continue;
+        if (kvSub.FindKey(modePath).IsNull()) {
+            continue;
+        }
 
         bool isBuiltIn = kvSub.GetInt("builtin") == 1;
         if (isBuiltIn == official) {
-            if (TranslationPhraseExists(missionName)) {
-				Format(displayTitle, sizeof(displayTitle), "%T", missionName, client);
-				} else {
-				strcopy(displayTitle, sizeof(displayTitle), missionName);
-				}
+            // 尝试从翻译文件获取，如果失败则使用原名
+            if (!TranslatePhrase(client, missionName, displayTitle, sizeof(displayTitle))) {
+                strcopy(displayTitle, sizeof(displayTitle), missionName);
+            }
             menu.AddItem(missionName, displayTitle);
+            itemCount++;
         }
+    }
+
+    if (itemCount == 0) {
+        PrintToChat(client, "[SM] No maps found for current game mode.");
+        delete menu;
+        return;
     }
 
     menu.ExitBackButton = true;
@@ -201,7 +280,6 @@ public int MenuHandler_MissionList(Menu menu, MenuAction action, int client, int
     if (action == MenuAction_Select) {
         char missionName[64];
         menu.GetItem(choice, missionName, sizeof(missionName));
-		
         Display_ChapterListMenu(client, missionName);
     } else if (action == MenuAction_Cancel) {
         if (choice == MenuCancel_ExitBack) {
@@ -216,15 +294,16 @@ public int MenuHandler_MissionList(Menu menu, MenuAction action, int client, int
 /**
  * 菜单3: 显示章节列表
  */
-
 void Display_ChapterListMenu(int client, const char[] missionName) {
+    if (!IsClientValid(client)) {
+        return;
+    }
+    
     Menu menu = new Menu(MenuHandler_ChapterList);
     char title[128];
-    if (TranslationPhraseExists(missionName)) {
-		Format(title, sizeof(title), "%T", missionName, client);
-	} else {
-    strcopy(title, sizeof(title), missionName);
-	}
+    if (!TranslatePhrase(client, missionName, title, sizeof(title))) {
+        strcopy(title, sizeof(title), missionName);
+    }
     menu.SetTitle(title);
 
     SourceKeyValues kvMissions = SDKCall(g_hSDK_GetAllMissions, g_pMatchExtL4D);
@@ -241,17 +320,24 @@ void Display_ChapterListMenu(int client, const char[] missionName) {
         return;
     }
 
+    int itemCount = 0;
     char mapName[64], displayMapName[128];
+    
     for (SourceKeyValues kvMap = kvChapters.GetFirstTrueSubKey(); !kvMap.IsNull(); kvMap = kvMap.GetNextTrueSubKey()) {
         kvMap.GetString("Map", mapName, sizeof(mapName));
         if (IsMapValid(mapName)) {
-            if (TranslationPhraseExists(mapName)) {
-				Format(displayMapName, sizeof(displayMapName), "%T", mapName, client);
-			} else {
-				strcopy(displayMapName, sizeof(displayMapName), mapName);
-			}
+            if (!TranslatePhrase(client, mapName, displayMapName, sizeof(displayMapName))) {
+                strcopy(displayMapName, sizeof(displayMapName), mapName);
+            }
             menu.AddItem(mapName, displayMapName);
+            itemCount++;
         }
+    }
+
+    if (itemCount == 0) {
+        PrintToChat(client, "[SM] No valid maps found for this mission.");
+        delete menu;
+        return;
     }
 
     menu.ExitBackButton = true;
@@ -273,11 +359,34 @@ public int MenuHandler_ChapterList(Menu menu, MenuAction action, int client, int
     return 0;
 }
 
-
 // --- 辅助函数 ---
 
+bool IsClientValid(int client) {
+    return (client > 0 && client <= MaxClients && IsClientConnected(client) && !IsFakeClient(client));
+}
+
+bool TranslatePhrase(int client, const char[] phrase, char[] buffer, int maxlen) {
+    // 尝试使用SourceMod翻译系统
+    char temp[256];
+    Format(temp, sizeof(temp), "%T", phrase, client);
+    
+    // 如果翻译失败，temp会等于格式字符串，这时返回false
+    if (StrContains(temp, "%T") != -1) {
+        return false;
+    }
+    
+    strcopy(buffer, maxlen, temp);
+    return true;
+}
+
 void TriggerMapChange(const char[] map) {
-    PrintToChatAll("\x04[SM]\x01 Admin is forcing a map change to \x03%s\x01.", map);
+    char mapDisplayName[128];
+    if (!TranslatePhrase(0, map, mapDisplayName, sizeof(mapDisplayName))) {
+        strcopy(mapDisplayName, sizeof(mapDisplayName), map);
+    }
+    
+    PrintToChatAll("\x04[SM]\x01 Admin is forcing a map change to \x03%s\x01.", mapDisplayName);
+    
     DataPack dp = new DataPack();
     dp.WriteString(map);
     CreateTimer(2.0, Timer_ChangeMap, dp, TIMER_FLAG_NO_MAPCHANGE);
@@ -292,7 +401,7 @@ public Action Timer_ChangeMap(Handle timer, DataPack dp) {
     if (g_bMapChanger_L4D2Changelevel && GetFeatureStatus(FeatureType_Native, "L4D2_ChangeLevel") == FeatureStatus_Available) {
         L4D2_ChangeLevel(mapName);
     } else if (g_bMapChanger_MapChanger && GetFeatureStatus(FeatureType_Native, "MC_SetNextMap") == FeatureStatus_Available) {
-        MC_SetNextMap(mapName); 
+        MC_SetNextMap(mapName);
         ServerCommand("changelevel %s", mapName);
     } else {
         ServerCommand("changelevel %s", mapName);
@@ -305,6 +414,13 @@ Action Cmd_ReloadMissions(int client, int args) {
     ServerCommand("update_addon_paths; mission_reload");
     ServerExecute();
     ReplyToCommand(client, "VPKs and missions reloaded.");
+    CreateTimer(1.0, Timer_GenerateTranslations);
+    return Plugin_Handled;
+}
+
+Action Cmd_GenerateTranslations(int client, int args) {
+    ReplyToCommand(client, "Forcing regeneration of map translation files...");
+    GenerateTranslationFiles();
     return Plugin_Handled;
 }
 
@@ -313,27 +429,133 @@ void OnGameModeChanged(ConVar convar, const char[] oldValue, const char[] newVal
 }
 
 void UpdateCurrentGameMode() {
-    g_cvMPGameMode.GetString(g_sCurrentGameMode, sizeof(g_sCurrentGameMode));
+    if (g_cvMPGameMode != null) {
+        g_cvMPGameMode.GetString(g_sCurrentGameMode, sizeof(g_sCurrentGameMode));
+    }
 }
 
-void Init_GameData() {
-    GameData hGameData = new GameData("l4d2_map_vote");
-    if (hGameData == null) {
-        SetFailState("Failed to load 'l4d2_map_vote.txt' gamedata file. This plugin requires files from 'l4d2_map_vote' plugin.");
+/**
+ * 生成翻译文件
+ */
+void GenerateTranslationFiles() {
+    char pathMissions[PLATFORM_MAX_PATH];
+    char pathChapters[PLATFORM_MAX_PATH];
+    
+    BuildPath(Path_SM, pathMissions, sizeof(pathMissions), "translations/%s", TRANSLATION_MISSIONS);
+    BuildPath(Path_SM, pathChapters, sizeof(pathChapters), "translations/%s", TRANSLATION_CHAPTERS);
+
+    KeyValues kvMissions = new KeyValues("Phrases");
+    KeyValues kvChapters = new KeyValues("Phrases");
+    
+    // 如果文件存在，先导入现有数据
+    if (FileExists(pathMissions)) {
+        kvMissions.ImportFromFile(pathMissions);
+    }
+    
+    if (FileExists(pathChapters)) {
+        kvChapters.ImportFromFile(pathChapters);
+    }
+
+    SourceKeyValues kvAllMissions = SDKCall(g_hSDK_GetAllMissions, g_pMatchExtL4D);
+    if (kvMissions == null) {
+        LogError("Could not get mission list from game.");
+        delete kvMissions;
+        delete kvChapters;
         return;
     }
 
+    char missionKey[64], chapterKey[64];
+    char missionTitle[128], chapterTitle[128];
+    
+    // 遍历所有战役
+    for (SourceKeyValues kvSub = kvAllMissions.GetFirstTrueSubKey(); !kvSub.IsNull(); kvSub = kvSub.GetNextTrueSubKey()) {
+        kvSub.GetName(missionKey, sizeof(missionKey));
+        if (g_smExclude.ContainsKey(missionKey)) {
+            continue;
+        }
+
+        kvSub.GetString("DisplayTitle", missionTitle, sizeof(missionTitle), missionKey);
+        
+        // 添加战役翻译
+        AddTranslationEntry(kvMissions, missionKey, missionTitle);
+
+        // 遍历章节
+        SourceKeyValues kvModes = kvSub.FindKey("modes");
+        if (kvModes.IsNull()) {
+            continue;
+        }
+
+        for (SourceKeyValues kvMode = kvModes.GetFirstTrueSubKey(); !kvMode.IsNull(); kvMode = kvMode.GetNextTrueSubKey()) {
+            for (SourceKeyValues kvChapter = kvMode.GetFirstTrueSubKey(); !kvChapter.IsNull(); kvChapter = kvChapter.GetNextTrueSubKey()) {
+                kvChapter.GetString("Map", chapterKey, sizeof(chapterKey));
+                if (StrEqual(chapterKey, "")) {
+                    continue;
+                }
+
+                kvChapter.GetString("DisplayName", chapterTitle, sizeof(chapterTitle), chapterKey);
+                
+                // 添加章节翻译
+                AddTranslationEntry(kvChapters, chapterKey, chapterTitle);
+            }
+        }
+    }
+
+    // 导出文件
+    kvMissions.ExportToFile(pathMissions);
+    kvChapters.ExportToFile(pathChapters);
+    
+    delete kvMissions;
+    delete kvChapters;
+
+    LogMessage("Translation files updated successfully.");
+    
+    // 重新加载翻译
+    LoadTranslations(TRANSLATION_MISSIONS);
+    LoadTranslations(TRANSLATION_CHAPTERS);
+}
+
+
+void AddTranslationEntry(KeyValues kv, const char[] key, const char[] displayName) {
+    kv.JumpToKey(key, true);
+    
+    // 简化翻译逻辑，直接使用显示名称
+    kv.SetString("en", displayName);
+    kv.SetString("chi", displayName);
+    
+    kv.GoBack();
+}
+
+bool Init_GameData() {
+    GameData hGameData = new GameData("l4d2_map_vote");
+    if (hGameData == null) {
+        LogError("Failed to load 'l4d2_map_vote.txt' gamedata file.");
+        return false;
+    }
+
     g_pDirector = hGameData.GetAddress("CDirector");
-    if (g_pDirector == Address_Null) SetFailState("Failed to find address: 'CDirector'");
+    if (g_pDirector == Address_Null) {
+        LogError("Failed to find address: 'CDirector'");
+        delete hGameData;
+        return false;
+    }
 
     g_pMatchExtL4D = hGameData.GetAddress("g_pMatchExtL4D");
-    if (g_pMatchExtL4D == Address_Null) SetFailState("Failed to find address: 'g_pMatchExtL4D'");
+    if (g_pMatchExtL4D == Address_Null) {
+        LogError("Failed to find address: 'g_pMatchExtL4D'");
+        delete hGameData;
+        return false;
+    }
 
     StartPrepSDKCall(SDKCall_Raw);
     PrepSDKCall_SetVirtual(0);
     PrepSDKCall_SetReturnInfo(SDKType_PlainOldData, SDKPass_Plain);
     g_hSDK_GetAllMissions = EndPrepSDKCall();
-    if (g_hSDK_GetAllMissions == null) SetFailState("Failed to create SDKCall: 'MatchExtL4D::GetAllMissions'");
+    if (g_hSDK_GetAllMissions == null) {
+        LogError("Failed to create SDKCall: 'MatchExtL4D::GetAllMissions'");
+        delete hGameData;
+        return false;
+    }
 
     delete hGameData;
+    return true;
 }

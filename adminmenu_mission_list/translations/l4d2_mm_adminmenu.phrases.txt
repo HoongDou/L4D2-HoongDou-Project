@@ -3,7 +3,7 @@
 	"Switch Map/Mission"
 	{
 		"en"		"Switch Map/Mission"
-		"chi"		"切换地图/战役"
+		"chi"		"切换地图/关卡"
 	}
 	
 	"Official Maps"
@@ -17,13 +17,7 @@
 		"en"		"Addon Maps"  
 		"chi"		"三方地图"
 	}
-	
-	"All Maps"
-	{
-		"en"		"All Maps"
-		"chi"		"全部地图"
-	}
-	
+
 	"Official Missions"
 	{
 		"en"		"Official Missions"
