@@ -60,3 +60,6 @@ Smoker拉人动作丢失的修复。目前只在versus模式下测试过。其�
 
 15. MeleeInTheSafeRoom
 开局生成近战，只更新了语法。
+
+16. adminmenu_mission_list
+适配fdxx和钵钵鸡大佬的换图插件，是在管理员菜单直接操作，可读取翻译后的地图/关卡名，方便分类换图。
