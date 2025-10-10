@@ -16,7 +16,7 @@ Scripting是编译环境，有兴趣的可以自行下载。
 
 2. connect_infomation
 使用旧版的geoipcity数据库，显示连接城市和断开连接的原因。一个低配版本的cannounce.
-（新版在主目录下-connectinfo，通过一个免费的Api进行查询，该Api每天允许500次免费调用次数）
+（新版在主目录下-connectinfo，通过两个免费的Api进行查询，这两个Api每天分别允许500次免费调用次数）
 ripext扩展：https://github.com/ErikMinekus/sm-ripext
 
 4. healup
