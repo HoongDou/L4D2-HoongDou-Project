@@ -65,3 +65,7 @@ Smoker拉人动作丢失的修复。目前只在versus模式下测试过。其�
 
 17. adminmenu_mission_list
 适配fdxx和钵钵鸡大佬的换图插件，是在管理员菜单直接操作，可读取翻译后的地图/关卡名，方便分类换图。
+
+18. server_rpg
+魔改树树子的ServerRpgWithDatabase的项目，项目依赖啥的可以参考它的。链接：https://github.com/GlowingTree880/L4D2_LittlePlugins/tree/2883982d2c5edf8dc6794858695660a83dd39299/ServerRpgWithDatabase
+一般功能的精简和保留黑枪、死亡数、地图游玩数的统计。支持月度统计和总体统计。
