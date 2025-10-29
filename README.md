@@ -69,3 +69,6 @@ Smoker拉人动作丢失的修复。目前只在versus模式下测试过。其�
 18. server_rpg
 魔改树树子的ServerRpgWithDatabase的项目，参考链接：https://github.com/GlowingTree880/L4D2_LittlePlugins/tree/2883982d2c5edf8dc6794858695660a83dd39299/ServerRpgWithDatabase
 一般功能的精简和保留黑枪、死亡数、地图游玩数的统计。支持月度统计和总体统计。
+
+19. l4d_hats
+魔改Silver的帽子插件，主要适配上面的数据库插件，以实现 月度黑枪榜第一和总黑枪榜第一自动佩戴对应的帽子。
